@@ -263,7 +263,8 @@ export async function generateDraft(
   );
 
   let draft = result.data ? sanitizeDraft(result.data) : null;
-  let source: "ai" | "template" = "ai";
+  // The offline mock returns the standard template; label it honestly.
+  let source: "ai" | "template" = provider.name === "mock" ? "template" : "ai";
   const guardNotes: string[] = [];
   if (!draft) {
     guardNotes.push(`AI provider unavailable (${result.error}); used the standard template.`);
