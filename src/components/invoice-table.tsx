@@ -40,7 +40,7 @@ export function InvoiceTable({ rows, showAttention = false }: { rows: InvoiceRow
               <td className="px-4 py-2">
                 <PriorityBadge score={inv.aiPriority} />
               </td>
-              <td className="px-2 py-2">
+              <td className="whitespace-nowrap px-2 py-2">
                 <Link className="font-medium text-blue-700 hover:underline" href={`/invoices/${inv.id}`}>
                   {inv.invoiceNumber}
                 </Link>
