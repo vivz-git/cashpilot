@@ -28,7 +28,7 @@ class FlakyProvider implements EmailProvider {
   readonly name = "flaky";
   calls = 0;
   constructor(private readonly failures: EmailSendError[]) {}
-  async send(_email: OutgoingEmail) {
+  async send() {
     this.calls += 1;
     const f = this.failures.shift();
     if (f) throw f;
