@@ -16,7 +16,7 @@ export function getAiProvider(): AiProvider {
   if (name === "groq") {
     const key = process.env.GROQ_API_KEY;
     if (!key) throw new Error("AI_PROVIDER=groq but GROQ_API_KEY is not set");
-    return new GroqProvider(key, process.env.GROQ_MODEL || "llama-3.3-70b-versatile");
+    return new GroqProvider(key, process.env.GROQ_MODEL || "openai/gpt-oss-120b");
   }
   return new MockProvider();
 }

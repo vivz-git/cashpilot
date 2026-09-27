@@ -26,7 +26,9 @@ export class GroqProvider implements AiProvider {
         body: JSON.stringify({
           model: this.model,
           temperature: 0.2,
-          max_tokens: 1200,
+          max_tokens: 3000,
+          // Reasoning models spend output tokens thinking; keep it short for structured tasks.
+          ...(this.model.startsWith("openai/gpt-oss") ? { reasoning_effort: "low" } : {}),
           response_format: { type: "json_object" },
           messages: [
             { role: "system", content: request.system },
