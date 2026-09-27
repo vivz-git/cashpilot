@@ -15,6 +15,7 @@ import { formatMoney } from "@/lib/money";
 import { recordActivity } from "../activities";
 import { audit } from "../audit";
 import { requirePermission, type AuthContext } from "../auth/context";
+import { releaseStaleSends } from "../email/recovery";
 import { AppError } from "../errors";
 import { getInvoice } from "../invoices/queries";
 import { checkRateLimit, LIMITS } from "../rate-limit";
@@ -280,6 +281,7 @@ export async function generateDraft(
     source = "template";
   }
   const finalDraft = draft;
+  await releaseStaleSends(db, ctx, invoiceId, now);
 
   const followUp = await db.transaction(async (tx) => {
     const inFlight = await tx

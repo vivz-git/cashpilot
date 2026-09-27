@@ -218,6 +218,57 @@ describe("approveAndSend", () => {
   });
 });
 
+describe("interrupted sends", () => {
+  async function stuck(ctx: AuthContext, minutesAgo: number) {
+    const { invoiceId, followUp } = await draftFor(ctx);
+    const at = new Date(Date.now() - minutesAgo * 60_000);
+    await getDb().update(followUps).set({ status: "sending", updatedAt: at }).where(eq(followUps.id, followUp.id));
+    await getDb().insert(emailMessages).values({
+      organizationId: ctx.orgId,
+      invoiceId,
+      followUpId: followUp.id,
+      userId: ctx.userId,
+      recipient: "ap@northwind.example",
+      subject: followUp.subject,
+      body: followUp.body,
+      status: "sending",
+      provider: "mock",
+      createdAt: at,
+    });
+    return { invoiceId, followUp };
+  }
+
+  it("blocks a retry while a send is still in progress", async () => {
+    const owner = await createOrg();
+    const { followUp } = await stuck(owner, 1);
+    const provider = new MockEmailProvider();
+    await expect(approveAndSend(getDb(), owner, followUp.id, undefined, { provider })).rejects.toThrow("already being sent");
+    expect(provider.sent).toHaveLength(0);
+  });
+
+  it("lets a human retry an interrupted send, recording the unknown delivery", async () => {
+    const owner = await createOrg();
+    const { invoiceId, followUp } = await stuck(owner, 30);
+    const provider = new MockEmailProvider();
+    await expect(approveAndSend(getDb(), owner, followUp.id, undefined, { provider })).resolves.toMatchObject({ ok: true });
+    expect(provider.sent).toHaveLength(1);
+    const msgs = await emailsFor(invoiceId);
+    expect(msgs.map((m) => m.status).sort()).toEqual(["failed", "sent"]);
+    expect(msgs.find((m) => m.status === "failed")!.error).toMatch(/interrupted/);
+    const acts = await getDb().select().from(activities).where(and(eq(activities.invoiceId, invoiceId), eq(activities.type, "reminder_failed")));
+    expect(acts).toHaveLength(1);
+  });
+
+  it("redrafting releases an interrupted send instead of blocking forever", async () => {
+    const owner = await createOrg();
+    const { invoiceId, followUp } = await stuck(owner, 30);
+    const { followUp: fresh } = await generateDraft(getDb(), owner, invoiceId);
+    const [old] = await getDb().select().from(followUps).where(eq(followUps.id, followUp.id));
+    expect(old!.status).toBe("discarded");
+    await expect(approveAndSend(getDb(), owner, fresh.id, undefined, { provider: new MockEmailProvider() })).resolves.toMatchObject({ ok: true });
+  });
+});
+
 describe("email permissions", () => {
   it("viewers cannot send or edit, and nothing is sent", async () => {
     const owner = await createOrg();

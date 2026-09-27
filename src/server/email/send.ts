@@ -1,4 +1,4 @@
-import { and, eq, gt, inArray, or } from "drizzle-orm";
+import { and, eq, gt, inArray, or, sql } from "drizzle-orm";
 import { z } from "zod";
 import type { Database } from "@/db";
 import { emailMessages, followUps, invoices, users, type FollowUp } from "@/db/schema";
@@ -14,6 +14,7 @@ import { getInvoice, isUuid } from "../invoices/queries";
 import { DEFAULT_FOLLOW_UP_DAYS } from "../invoices/schedule";
 import { checkRateLimit, LIMITS } from "../rate-limit";
 import { emailFromAddress, EmailSendError, getEmailProvider, type EmailProvider } from "./provider";
+import { isStaleSending, releaseStaleSends, STALE_SENDING_MS } from "./recovery";
 
 export const MAX_SEND_ATTEMPTS = 3;
 export const MIN_HOURS_BETWEEN_REMINDERS = 24;
@@ -107,7 +108,11 @@ export async function approveAndSend(
   const now = opts.now ?? new Date();
   const sleep = opts.sleep ?? defaultSleep;
 
-  const draft = await loadFollowUp(db, ctx, followUpId);
+  let draft = await loadFollowUp(db, ctx, followUpId);
+  if (isStaleSending(draft, now)) {
+    await releaseStaleSends(db, ctx, draft.invoiceId, now);
+    draft = await loadFollowUp(db, ctx, followUpId);
+  }
   if (draft.status === "sent") throw new AppError("This reminder has already been sent.", "conflict");
   if (draft.status === "sending") throw new AppError("This reminder is already being sent.", "conflict");
   if (draft.status === "discarded") throw new AppError("This draft was replaced by a newer one.", "conflict");
@@ -132,7 +137,9 @@ export async function approveAndSend(
   // Serialise sends per invoice: lock the invoice row, enforce the reminder
   // spacing rule, then claim the draft with a conditional update. A second
   // click or concurrent request finds the draft no longer in draft/failed.
-  await db.transaction(async (tx) => {
+  const recipient = invoice.customerEmail;
+  const provider = opts.provider ?? getEmailProvider();
+  const [message] = await db.transaction(async (tx) => {
     await tx
       .select({ id: invoices.id })
       .from(invoices)
@@ -146,7 +153,7 @@ export async function approveAndSend(
           eq(emailMessages.organizationId, ctx.orgId),
           eq(emailMessages.invoiceId, invoice.id),
           or(
-            eq(emailMessages.status, "sending"),
+            and(eq(emailMessages.status, "sending"), gt(emailMessages.createdAt, new Date(now.getTime() - STALE_SENDING_MS))),
             and(
               eq(emailMessages.status, "sent"),
               gt(emailMessages.sentAt, new Date(now.getTime() - MIN_HOURS_BETWEEN_REMINDERS * 3_600_000)),
@@ -173,24 +180,21 @@ export async function approveAndSend(
       )
       .returning();
     if (claimed.length === 0) throw new AppError("This reminder is already being sent.", "conflict");
+    return tx
+      .insert(emailMessages)
+      .values({
+        organizationId: ctx.orgId,
+        invoiceId: invoice.id,
+        followUpId,
+        userId: ctx.userId,
+        recipient,
+        subject: clean.subject,
+        body: clean.body,
+        status: "sending",
+        provider: provider.name,
+      })
+      .returning({ id: emailMessages.id });
   });
-
-  const recipient = invoice.customerEmail;
-  const provider = opts.provider ?? getEmailProvider();
-  const [message] = await db
-    .insert(emailMessages)
-    .values({
-      organizationId: ctx.orgId,
-      invoiceId: invoice.id,
-      followUpId,
-      userId: ctx.userId,
-      recipient,
-      subject: clean.subject,
-      body: clean.body,
-      status: "sending",
-      provider: provider.name,
-    })
-    .returning({ id: emailMessages.id });
   await audit(db, {
     orgId: ctx.orgId,
     userId: ctx.userId,
@@ -247,7 +251,7 @@ export async function approveAndSend(
         .update(invoices)
         .set({
           lastContactAt: sentAt,
-          followUpCount: invoice.followUpCount + 1,
+          followUpCount: sql`${invoices.followUpCount} + 1`,
           nextFollowUpDate: next,
           updatedAt: sentAt,
         })

@@ -11,6 +11,7 @@ import { ACTIVITY_LABELS } from "@/lib/labels";
 import { formatMoney } from "@/lib/money";
 import { listTimeline } from "@/server/activities";
 import { needsHumanReview } from "@/server/ai/guard";
+import { INTERRUPTED_MESSAGE, isStaleSending } from "@/server/email/recovery";
 import { can } from "@/server/auth/context";
 import { requireSession } from "@/server/auth/session";
 import { NotFoundError } from "@/server/errors";
@@ -137,7 +138,7 @@ export default async function InvoicePage({ params }: { params: Promise<{ id: st
           <Card
             title="Follow-up email"
             actions={
-              canWrite && isOpen && activeDraft?.status !== "sending" ? (
+              canWrite && isOpen && !(activeDraft?.status === "sending" && !isStaleSending(activeDraft)) ? (
                 <ActionButton action={generateDraftAction.bind(null, invoice.id)} pendingText="Drafting…" variant={activeDraft ? "secondary" : "primary"}>
                   {activeDraft ? "Redraft" : "Draft follow-up"}
                 </ActionButton>
@@ -150,7 +151,7 @@ export default async function InvoicePage({ params }: { params: Promise<{ id: st
               <EmptyState title="No draft.">
                 {canWrite ? "Draft a follow-up. Nothing is sent until you review it and click Approve & Send." : "Your role is read-only."}
               </EmptyState>
-            ) : activeDraft.status === "sending" ? (
+            ) : activeDraft.status === "sending" && !isStaleSending(activeDraft) ? (
               <Alert tone="info">This email is being sent. Refresh in a moment to see the delivery status.</Alert>
             ) : (
               <DraftEditor
@@ -160,8 +161,12 @@ export default async function InvoicePage({ params }: { params: Promise<{ id: st
                 subject={activeDraft.subject}
                 body={activeDraft.body}
                 source={activeDraft.source}
-                failed={activeDraft.status === "failed"}
-                lastError={emails.find((e) => e.followUpId === activeDraft.id && e.status === "failed")?.error ?? null}
+                failed={activeDraft.status !== "draft"}
+                lastError={
+                  activeDraft.status === "sending"
+                    ? INTERRUPTED_MESSAGE
+                    : (emails.find((e) => e.followUpId === activeDraft.id && e.status === "failed")?.error ?? null)
+                }
                 recipient={invoice.customerEmail}
                 invoiceNumber={invoice.invoiceNumber}
                 amount={formatMoney(invoice.amountMinor, invoice.currency)}
