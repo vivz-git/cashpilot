@@ -1,6 +1,7 @@
+import "server-only";
 import { createHash, randomBytes } from "node:crypto";
 import bcrypt from "bcryptjs";
-import { and, eq, gt, sql } from "drizzle-orm";
+import { and, eq, gt, lt, sql } from "drizzle-orm";
 import { z } from "zod";
 import type { Database } from "@/db";
 import { organizations, sessions, users, type Role, type User } from "@/db/schema";
@@ -23,7 +24,8 @@ const email = z
 const password = z
   .string()
   .min(10, "Password must be at least 10 characters.")
-  .max(200, "Password is too long.");
+  // bcrypt only uses the first 72 bytes; reject longer passwords instead of silently truncating.
+  .refine((p) => Buffer.byteLength(p, "utf8") <= 72, "Password must be at most 72 bytes.");
 const name = z.string().trim().min(1, "Name is required.").max(100);
 
 export const signupSchema = z.object({
@@ -103,6 +105,7 @@ export async function login(
     throw new AppError("Invalid email or password.", "unauthenticated");
   }
 
+  await db.delete(sessions).where(and(eq(sessions.userId, user.id), lt(sessions.expiresAt, new Date())));
   const token = randomBytes(32).toString("base64url");
   const expiresAt = new Date(Date.now() + SESSION_TTL_MS);
   await db.insert(sessions).values({ id: hashToken(token), userId: user.id, expiresAt });

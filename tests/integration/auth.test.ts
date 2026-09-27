@@ -49,6 +49,10 @@ describe("authentication", () => {
     await expect(
       signup(getDb(), { organizationName: "X", name: "X", email: "nope", password: PASSWORD }),
     ).rejects.toThrow("valid email");
+    // bcrypt ignores bytes after 72, so longer passwords are rejected rather than truncated.
+    await expect(
+      signup(getDb(), { organizationName: "X", name: "X", email: uniqueEmail(), password: "é".repeat(37) }),
+    ).rejects.toThrow("72 bytes");
   });
 
   it("invalidates sessions on logout and ignores garbage or expired tokens", async () => {
@@ -62,6 +66,11 @@ describe("authentication", () => {
     const second = await login(getDb(), { email: owner.email, password: PASSWORD });
     await getDb().update(sessions).set({ expiresAt: new Date(Date.now() - 1000) }).where(eq(sessions.userId, owner.userId));
     expect(await validateSession(getDb(), second.token)).toBeNull();
+
+    // Expired sessions are purged at the next login.
+    await login(getDb(), { email: owner.email, password: PASSWORD });
+    const remaining = await getDb().select().from(sessions).where(eq(sessions.userId, owner.userId));
+    expect(remaining).toHaveLength(1);
   });
 });
 

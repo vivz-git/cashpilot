@@ -1,3 +1,4 @@
+import "server-only";
 import nodemailer, { type Transporter } from "nodemailer";
 
 export interface OutgoingEmail {
