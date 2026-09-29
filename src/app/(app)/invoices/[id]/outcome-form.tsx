@@ -30,7 +30,7 @@ export function OutcomeForm({ invoiceId, isOpen, disputeOpen }: { invoiceId: str
     <form action={action} className="space-y-3" data-testid="outcome-form">
       <input type="hidden" name="invoiceId" value={invoiceId} />
       <label className="block text-sm">
-        <span className="mb-1 block font-medium text-slate-700">Outcome</span>
+        <span className="mb-1.5 block font-medium text-slate-700">Outcome</span>
         <select name="type" className={inputClass} value={selected.value} onChange={(e) => setType(e.target.value)}>
           {available.map((o) => (
             <option key={o.value} value={o.value}>{o.label}</option>
@@ -39,12 +39,12 @@ export function OutcomeForm({ invoiceId, isOpen, disputeOpen }: { invoiceId: str
       </label>
       {selected.value === "promised_payment" && (
         <label className="block text-sm">
-          <span className="mb-1 block font-medium text-slate-700">Promised payment date</span>
+          <span className="mb-1.5 block font-medium text-slate-700">Promised payment date</span>
           <input type="date" name="promisedDate" className={inputClass} required />
         </label>
       )}
       <label className="block text-sm">
-        <span className="mb-1 block font-medium text-slate-700">{selected.note}</span>
+        <span className="mb-1.5 block font-medium text-slate-700">{selected.note}</span>
         <textarea name="note" className={`${inputClass} min-h-20`} maxLength={2000} required={selected.noteRequired} />
       </label>
       {state?.error && <Alert tone="error">{state.error}</Alert>}
