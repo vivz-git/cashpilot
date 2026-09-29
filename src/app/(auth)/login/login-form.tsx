@@ -11,14 +11,14 @@ export function LoginForm() {
     <form action={action} className="space-y-4">
       {state?.error && <Alert tone="error">{state.error}</Alert>}
       <label className="block text-sm">
-        <span className="mb-1 block font-medium text-slate-700">Email</span>
+        <span className="mb-1.5 block font-medium text-slate-700">Email</span>
         <input className={inputClass} type="email" name="email" autoComplete="email" required />
       </label>
       <label className="block text-sm">
-        <span className="mb-1 block font-medium text-slate-700">Password</span>
+        <span className="mb-1.5 block font-medium text-slate-700">Password</span>
         <input className={inputClass} type="password" name="password" autoComplete="current-password" required />
       </label>
-      <SubmitButton pendingText="Signing in…">Sign in</SubmitButton>
+      <SubmitButton block pendingText="Signing in…">Sign in</SubmitButton>
     </form>
   );
 }

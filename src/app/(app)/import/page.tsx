@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { Alert, Card } from "@/components/ui";
+import { Alert, Card, PageHeader } from "@/components/ui";
 import { can } from "@/server/auth/context";
 import { requireSession } from "@/server/auth/session";
 import { MAX_CSV_ROWS, OPTIONAL_COLUMNS, REQUIRED_COLUMNS } from "@/server/invoices/csv";
@@ -15,19 +15,19 @@ export default async function ImportPage() {
   const session = await requireSession();
   const canWrite = can(session.ctx, "write");
   return (
-    <div className="max-w-3xl space-y-6">
-      <div>
-        <h1 className="text-xl font-semibold">Import invoices</h1>
-        <p className="text-sm text-slate-500">Upload a CSV export of your open invoices. Nothing is imported if any row has an error.</p>
-      </div>
+    <div className="max-w-3xl space-y-8">
+      <PageHeader
+        title="Import invoices"
+        description="Upload a CSV export of your open invoices. Nothing is imported if any row has an error."
+      />
       {canWrite ? (
-        <Card title="Upload CSV">
+        <Card title="Upload CSV" description="Invoice numbers already in CashPilot are skipped, never overwritten.">
           <ImportForm />
         </Card>
       ) : (
         <Alert tone="info">Your role is read-only. Ask an owner or member to import invoices.</Alert>
       )}
-      <Card title="File format">
+      <Card title="File format" description="What CashPilot reads from your file.">
         <div className="space-y-3 text-sm text-slate-700">
           <p>
             Exported from your accounting tool or a spreadsheet with different column names? Upload it as it is:
@@ -44,7 +44,7 @@ export default async function ImportPage() {
             <li>Invoice numbers already in CashPilot are skipped, not overwritten.</li>
             <li>Up to {MAX_CSV_ROWS.toLocaleString()} rows and 2 MB per file.</li>
           </ul>
-          <pre className="overflow-x-auto rounded-md bg-slate-50 p-3 text-xs text-slate-700">{EXAMPLE}</pre>
+          <pre className="overflow-x-auto whitespace-pre rounded-lg bg-slate-50 p-3 font-mono text-xs leading-relaxed text-slate-700 ring-1 ring-inset ring-slate-200/80">{EXAMPLE}</pre>
         </div>
       </Card>
     </div>
