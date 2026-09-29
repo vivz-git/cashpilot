@@ -6,7 +6,7 @@ import { recordActivity } from "../activities";
 import { audit } from "../audit";
 import { requirePermission, type AuthContext } from "../auth/context";
 import { AppError } from "../errors";
-import { MAX_CSV_BYTES, parseInvoiceCsv, type ImportRowError } from "./csv";
+import { inspectCsv, MAX_CSV_BYTES, parseInvoiceCsv, type ColumnMapping, type CsvInspection, type ImportRowError } from "./csv";
 
 export type ImportResult =
   | {
@@ -16,12 +16,14 @@ export type ImportResult =
       skippedDuplicates: string[];
       warnings: string[];
     }
-  | { ok: false; errors: ImportRowError[]; warnings: string[] };
+  | { ok: false; errors: ImportRowError[]; warnings: string[]; needsMapping?: CsvInspection };
 
 export async function importInvoicesCsv(
   db: Database,
   ctx: AuthContext,
   file: { name: string; text: string; size: number },
+  /** Confirmed by the user for files that do not use CashPilot's column names. */
+  mapping?: ColumnMapping,
 ): Promise<ImportResult> {
   requirePermission(ctx, "write");
   if (file.size > MAX_CSV_BYTES) {
@@ -31,8 +33,14 @@ export async function importInvoicesCsv(
     throw new AppError("Please upload a .csv file.");
   }
 
-  const parsed = parseInvoiceCsv(file.text);
-  if (!parsed.ok) return parsed;
+  // Files in another layout (e.g. an accounting export) need the user to confirm which column is which.
+  const inspected = inspectCsv(file.text);
+  if (!inspected.ok) return { ok: false, errors: inspected.errors, warnings: [] };
+  const needsMapping = inspected.canonical ? undefined : inspected.inspection;
+  if (needsMapping && !mapping) return { ok: false, errors: [], warnings: [], needsMapping };
+
+  const parsed = parseInvoiceCsv(file.text, needsMapping ? mapping : undefined);
+  if (!parsed.ok) return { ...parsed, needsMapping };
 
   return db.transaction(async (tx) => {
     const numbers = parsed.rows.map((r) => r.invoiceNumber);
@@ -122,7 +130,11 @@ export async function importInvoicesCsv(
       action: "invoices.imported",
       targetType: "import",
       targetId: imp!.id,
-      metadata: { imported: importedCount, skipped: skippedDuplicates.length },
+      metadata: {
+        imported: importedCount,
+        skipped: skippedDuplicates.length,
+        ...(needsMapping && mapping ? { columnMapping: mapping.columns, dateFormat: mapping.dateFormat } : {}),
+      },
     });
 
     return {

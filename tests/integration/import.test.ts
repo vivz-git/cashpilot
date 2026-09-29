@@ -56,6 +56,55 @@ describe("CSV import", () => {
     expect(rows).toHaveLength(0);
   });
 
+  it("asks for column matching on another layout, imports nothing until confirmed, then imports with the mapping", async () => {
+    const owner = await createOrg();
+    // Hand-written accounting-style layout (not a real vendor export).
+    const text = [
+      "ContactName,EmailAddress,InvoiceNumber,InvoiceDate,DueDate,Total,InvoiceAmountDue,Currency",
+      "Fable Creative,ap@fablecreative.example,INV-0212,15 Jul 2026,14 Aug 2026,3600.00,3600.00,GBP",
+      'Orchard PR,accounts@orchardpr.example,INV-0219,02 Aug 2026,01 Sep 2026,"2,150.00","1,150.00",GBP',
+    ].join("\n");
+    const file = { name: "xero-export.csv", text, size: Buffer.byteLength(text) };
+
+    const first = await importInvoicesCsv(getDb(), owner, file);
+    expect(first.ok).toBe(false);
+    if (first.ok) return;
+    expect(first.errors).toEqual([]);
+    expect(first.needsMapping?.suggested.amount).toBe("InvoiceAmountDue");
+    expect(await getDb().select().from(invoices).where(eq(invoices.organizationId, owner.orgId))).toHaveLength(0);
+
+    const second = await importInvoicesCsv(getDb(), owner, file, {
+      columns: first.needsMapping!.suggested,
+      dateFormat: first.needsMapping!.dateFormat ?? "ymd",
+    });
+    expect(second).toMatchObject({ ok: true, imported: 2 });
+    const rows = await getDb().select().from(invoices).where(eq(invoices.organizationId, owner.orgId));
+    expect(rows.map((i) => [i.invoiceNumber, i.dueDate, i.amountMinor, i.currency]).sort()).toEqual([
+      ["INV-0212", "2026-08-14", 360000, "GBP"],
+      ["INV-0219", "2026-09-01", 115000, "GBP"],
+    ]);
+  });
+
+  it("returns row errors together with the column choices when a mapped file has problems", async () => {
+    const owner = await createOrg();
+    const text = "Customer,Email,Num,Date,Due date,Open balance\nHarbor,ap@harbor.example,1043,03/04/2026,03/05/2026,$100.00";
+    const r = await importInvoicesCsv(
+      getDb(),
+      owner,
+      { name: "qb.csv", text, size: text.length },
+      {
+        columns: { customer_name: "Customer", customer_email: "Email", invoice_number: "Num", invoice_date: "Date", due_date: "Due date", amount: "Open balance" },
+        dateFormat: "dmy",
+        defaultCurrency: "EUR",
+      },
+    );
+    expect(r.ok).toBe(false);
+    if (r.ok) return;
+    expect(r.needsMapping?.dateFormat).toBeNull();
+    expect(r.errors[0]).toMatchObject({ line: 2, column: "Open balance" });
+    expect(await getDb().select().from(invoices).where(eq(invoices.organizationId, owner.orgId))).toHaveLength(0);
+  });
+
   it("allows the same invoice number in different organizations", async () => {
     const a = await createOrg("A");
     const b = await createOrg("B");

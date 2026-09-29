@@ -30,12 +30,16 @@ export default async function ImportPage() {
       <Card title="File format">
         <div className="space-y-3 text-sm text-slate-700">
           <p>
+            Exported from your accounting tool or a spreadsheet with different column names? Upload it as it is:
+            you&apos;ll be asked to match its columns before anything is imported.
+          </p>
+          <p>
             <span className="font-medium">Required columns:</span> {REQUIRED_COLUMNS.join(", ")}.<br />
             <span className="font-medium">Optional columns:</span> {OPTIONAL_COLUMNS.join(", ")}.
           </p>
           <ul className="list-disc space-y-1 pl-5">
-            <li>Dates must be in YYYY-MM-DD format (e.g. 2026-07-31).</li>
-            <li>Amounts use a decimal point without currency symbols (e.g. 4250.00). Thousands separators are allowed.</li>
+            <li>Dates in YYYY-MM-DD format (e.g. 2026-07-31). When matching columns you can choose day-first or month-first dates instead.</li>
+            <li>Amounts use a decimal point (e.g. 4250.00). Thousands separators are allowed; currency symbols are accepted when matching columns.</li>
             <li>Currency is a 3-letter ISO code (USD, EUR, GBP…). Mixed currencies are fine; totals are shown per currency.</li>
             <li>Invoice numbers already in CashPilot are skipped, not overwritten.</li>
             <li>Up to {MAX_CSV_ROWS.toLocaleString()} rows and 2 MB per file.</li>
