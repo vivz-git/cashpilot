@@ -94,6 +94,9 @@ test("full journey: signup → import → analyze → draft → edit → approve
   await expect(sent).toHaveCount(1);
   await expect(sent).toContainText("sent");
   await expect(sent).toContainText("To ap@northwind.example");
+  // The E2E server uses the mock email provider: the UI must not present the email as delivered.
+  await expect(sent).toContainText("test mode · not delivered");
+  await expect(page.getByTestId("mode-banner")).toContainText("emails are recorded in CashPilot but not delivered");
   await expect(page.getByTestId("draft-editor")).toHaveCount(0);
 
   // Activity timeline
@@ -139,6 +142,13 @@ test("full journey: signup → import → analyze → draft → edit → approve
   await page.goto("/dashboard");
   await expect(page.locator("section", { hasText: "Promised to pay (1)" })).toContainText("BL-2041");
   await expect(page.locator("section", { hasText: "Disputed (1)" })).toContainText("BL-2044");
+  // The priority table shows the recorded dispute, not the earlier "send a friendly reminder" advice.
+  const disputedRow = queue.locator("tbody tr", { hasText: "BL-2044" });
+  await expect(disputedRow).toContainText("Disputed");
+  await expect(disputedRow).toContainText("Resolve the dispute before sending a payment reminder.");
+  await expect(disputedRow).not.toContainText("Send a friendly first reminder");
+  // BL-2041 was re-analyzed after its promise, so its recommendation is current again.
+  await expect(queue.locator("tbody tr", { hasText: "BL-2041" }).getByTestId("analysis-outdated")).toHaveCount(0);
 
   // Add a read-only teammate for the permission test below
   await page.goto("/team");
@@ -158,6 +168,29 @@ test("login rejects a wrong password and accepts the right one", async ({ page }
   await expect(page).toHaveURL(/\/login$/);
   await logIn(page, ownerEmail);
   await expect(page).toHaveURL(/\/dashboard$/);
+});
+
+test("an export with different column names imports after the user confirms the columns", async ({ page }) => {
+  await logIn(page, ownerEmail);
+  await expect(page).toHaveURL(/\/dashboard$/);
+
+  // Hand-written file in an accounting-export layout (not a real vendor export).
+  await importCsv(page, "accounting-style-export.csv");
+  const matcher = page.getByTestId("column-matcher");
+  await expect(matcher).toContainText("Match your columns");
+  await expect(matcher.getByLabel("Customer email")).toHaveValue("EmailAddress");
+  await expect(matcher.getByLabel("Amount owed")).toHaveValue("InvoiceAmountDue");
+  await expect(matcher.getByLabel("Date format")).toHaveValue("ymd");
+  // Nothing is imported before the user confirms.
+  const count = async () =>
+    (await db().query("select count(*)::int as n from invoices where invoice_number in ('XR-0212', 'XR-0219')")).rows[0].n;
+  expect(await count()).toBe(0);
+
+  await matcher.getByRole("button", { name: "Import with these columns" }).click();
+  await expect(page.getByText("Imported 2 invoices.")).toBeVisible();
+  expect(await count()).toBe(2);
+  const { rows } = await db().query("select amount_minor::int as amount_minor, due_date::text as due_date from invoices where invoice_number = 'XR-0219'");
+  expect(rows[0]).toMatchObject({ amount_minor: 115000, due_date: "2026-09-01" });
 });
 
 test("a viewer can read but cannot import, draft, send or record outcomes", async ({ page }) => {
