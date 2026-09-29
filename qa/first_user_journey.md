@@ -2,6 +2,8 @@
 
 Written from the perspective of a new, skeptical agency owner who has never used CashPilot, walking through the app for the first time with no prior knowledge beyond "it's an AI accounts-receivable assistant." Every step was actually performed against a running instance (PostgreSQL 16, `AI_PROVIDER=mock`, `EMAIL_PROVIDER=mock`, fake data only). Screenshots referenced are in `qa/screenshots/`.
 
+> **Update 2026-09-29:** a later verification pass ([test_results.md](test_results.md)) changed the picture in a few places. The narrative below is the 2026-09-28 walkthrough, kept as written; steps 5, 7, 11 and 12 carry dated notes, and an addendum at the end covers phone/tablet and the send checks.
+
 ---
 
 ## 1. Signup
@@ -32,6 +34,8 @@ My first dashboard, with zero invoices, says exactly one thing: **"No invoices y
 
 I click Import. The import page explains, in plain language, the required columns (`customer_name, customer_email, invoice_number, invoice_date, due_date, amount, currency`), the optional ones (`account_manager, notes`), the date format, and the row/size limits — and shows a live CSV example at the bottom of the page I could copy from. This is one of the best-designed screens in the product: everything I need to build a correct file is right there before I try anything.
 
+> **Update 2026-09-29 (High, provisional — new):** that holds if I am building the file to CashPilot's format. When a QuickBooks-style and a Xero-style CSV were tried, both were rejected: the error lists the expected columns but offers no way to map the file's columns onto them, and the importer needs exact column names and `YYYY-MM-DD` dates. The two test files were hand-written to mirror typical layouts, not downloaded from real accounts, so this shows a real usability gap but is **not** proof that every real export fails. Until real exports have been tried, plan on reshaping a pilot's file together with them. See H4 in [product_ux_audit.md](product_ux_audit.md).
+
 ## 6. Understanding errors
 
 I deliberately uploaded a malformed file first (bad email, US-not-a-country-code as a currency, wrong date format, a missing name, a missing invoice number). The result: **"The file was not imported. Fix these 6 problems and upload it again,"** followed by a table — Line, Column, Problem — with a specific, readable sentence for each ("`"06/01/2026" is not a valid date. Use YYYY-MM-DD, e.g. 2026-03-31.`"). (`qa/screenshots/07-desktop-import-malformed-errors.png`)
@@ -49,6 +53,8 @@ I fixed my file and re-uploaded — 7 invoices imported cleanly, confirmed with 
 I click **"Analyze 8 new invoices."** A couple of seconds later, every invoice now has a priority score out of 10, a situation tag, and a recommended action.
 
 *Here is where the "aha" moment should be — and it partially isn't.* Every single invoice, regardless of its notes, came back with situation **"Unknown"** and the exact same recommended action: *"Send a friendly first reminder and ask the customer to confirm they received the invoice."* This includes an invoice whose notes literally say "Customer disputes this charge" and one that says "will pay by the 30th." As a new user testing this with real notes from my own business, my honest first reaction would be: *"Did it even read the notes field?"* (It didn't — see the main audit's Critical issue #1 for why, and the important caveat that this is the offline/no-API-key mode, honestly labelled as such once you open an invoice.)
+
+> **Update 2026-09-29 (narrowed; C1 re-scored Critical → High):** the notes in this walkthrough were supplied through CSV import, and it is imported notes that the offline provider ignores. Promise and dispute information recorded through the product's own forms is honoured by the analysis (see step 12 note). Offline mode only; a real AI provider was not tested.
 
 ## 8. Understanding why an invoice is prioritized
 
@@ -75,6 +81,8 @@ I then edited it back to something reasonable before continuing.
 
 I clicked "Approve & Send." Within about a second, the page updated: **"Emails sent (1)"**, with status "sent," the exact recipient, my name as sender, a timestamp, and "1 attempt." The "Draft follow-up" section reset to "No draft" — meaning the only way to send *again* is to deliberately generate a new draft and approve it again. There is no button sitting there inviting an accidental second click.
 
+> **Update 2026-09-29:** a double-click on Approve & Send recorded exactly one email, and a second send within 24 hours was refused with the existing safety message. This is UI-level behaviour; server-level concurrency protection (documented by the build team) was not independently reproduced by this QA process.
+
 *"What am I supposed to do now?"* — Not confused. The state change was immediate, visible, and left no ambiguity about whether the email actually went out.
 
 ## 12. Recording the outcome
@@ -82,6 +90,8 @@ I clicked "Approve & Send." Within about a second, the page updated: **"Emails s
 On a different invoice with a "will pay by the 30th" note, I used the **Record outcome** panel: selected "Promised payment," a date field appeared, I filled it plus a free-text note, clicked Record. Instantly: the invoice header gained a status, "Promise to pay" in the details sidebar populated, and — most importantly — it disappeared from "Needs attention today" and appeared in a new "Promised to pay" section on the dashboard.
 
 I repeated this with "Dispute" on another invoice — it gained a "Disputed" badge and moved into a "Disputed" dashboard section with the reason visible.
+
+> **Update 2026-09-29 (offline/mock AI):** after these outcomes were recorded through the product forms, the analysis honoured them (the pass report does not say whether a manual re-analysis was needed first). A recorded promised payment moved the next follow-up to the day after and the analysis switched to "Promised payment" with high confidence. A recorded dispute cleared the next follow-up, the analysis said "Needs human judgement", and the generated draft was dispute-aware rather than a generic chase. Marking an invoice paid set it to Paid and lowered the outstanding total (57 to 56 in the test dataset). This is the path to steer users toward, since it works even in offline mode. The step 14 stale-table contradiction was not re-tested.
 
 ## 13. Understanding the timeline
 
@@ -109,3 +119,17 @@ Back on the dashboard, the numbers had updated correctly: "Needs attention today
 | 10 | Dashboard after recording an outcome | **Yes** | Table contradicts the card above it for the same invoice |
 
 **Net:** 2 of 10 journey moments produced genuine "wait, what?" hesitation, both tracing back to the same root cause — the AI recommendation not reflecting what the product already knows (either because it's running offline, or because it hasn't been told to re-check itself after new activity). Every other step of the core workflow was clear, well-labelled, and did what it said it would do.
+
+---
+
+## Addendum — 2026-09-29 verification pass
+
+Observed in a later pass (Chromium only, offline/mock AI, mock email, test data only; see [test_results.md](test_results.md) for limitations):
+
+- **Phone (390px) and tablet (768px):** no page-level horizontal overflow, but the dashboard tables clip their right-hand columns behind an inner horizontal scroll with no obvious cue. This confirms High issue #2 (H2).
+- **Roles:** a Viewer sees no Draft, Send, Record, Analyze, Import or Add-teammate controls. A Member can analyze, draft and send but cannot add teammates.
+- **Workspace isolation:** a second workspace could not access the first workspace's invoice; no data leakage observed.
+- **Import (step 5):** accounting-style layouts were rejected without mapping help (H4, provisional; hand-written fixtures).
+- **Overall effect on the "what am I supposed to do now?" table:** row 5 (AI analysis results in the dashboard table) is narrower than first recorded, because it concerns imported notes in offline mode. A new hesitation point exists at the import step (rows 3–4) for anyone importing an accounting export rather than a file built to CashPilot's format.
+
+Not yet tested: real Groq AI with a real API key; real SMTP delivery to a real mailbox; load beyond approximately 60 invoices; browsers other than Chromium; real customer files and real customer users.

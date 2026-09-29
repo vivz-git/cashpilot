@@ -7,6 +7,25 @@
 
 ---
 
+## Update — 2026-09-29 verification pass
+
+A later manual verification pass produced new evidence (detail, environment and limitations in [test_results.md](test_results.md)). The original 2026-09-28 text below is kept as written; findings affected by the later pass carry an "Update 2026-09-29" note. Summary of what changed:
+
+| Finding | 2026-09-28 | 2026-09-29 |
+|---|---|---|
+| C1 — offline AI ignores notes | Critical | **Narrowed and re-scored to High.** Only notes supplied through CSV import are ignored in offline mode; promise and dispute recorded through the product forms are honoured. |
+| H1 — stale dashboard table | High | Not re-tested; unchanged. |
+| H2 — tablet/phone table clipping | High | **Confirmed** at 390px and 768px; unchanged. |
+| H3 — all-or-nothing import | High | Not re-tested; unchanged. |
+| H4 — accounting-export layouts rejected | — | **New**, High (provisional). |
+| M1–M4, L1–L5 | — | Not re-tested; unchanged. |
+
+Counts: 0 Critical, 5 High, 4 Medium, 5 Low (was 1 / 3 / 4 / 5).
+
+Still untested: real Groq AI with a real API key; real SMTP delivery to a real mailbox; load beyond approximately 60 invoices; browsers other than Chromium; real customer files and real customer users. Concurrent duplicate-send protection was not independently reproduced by this QA process; only UI double-click behaviour was observed.
+
+---
+
 ## Executive summary
 
 CashPilot's MVP is **further along, better engineered, and more disciplined about safety than a typical first MVP.** The core loop — import → dashboard → AI analysis → draft → edit → approve & send → outcome → timeline — works end to end, every screen I touched rendered cleanly, and the product is honest in places where most MVPs would bluff (it labels its own analysis "low confidence" and "rule-based (offline mode)" rather than presenting a guess as fact).
@@ -17,7 +36,7 @@ CashPilot's MVP is **further along, better engineered, and more disciplined abou
 3. **Organization isolation held up.** A second, unrelated workspace could not open the first workspace's invoice by guessing its URL — it got a proper "Not found" page, not a 403 that would confirm the ID exists.
 
 **Biggest risks:**
-1. **The default, zero-config AI experience is not what the product promises.** With no `GROQ_API_KEY` (the out-of-the-box state, including the seeded demo account described in the README), every invoice — regardless of amount, days overdue, or notes text — gets situation "Unknown" and the identical recommended action, "Send a friendly first reminder…". Notes that say "customer disputes this charge" or "will pay by the 30th" are completely ignored by the analysis. This is defensible as an offline fallback, and it is honestly labelled, but it means the first impression of the product's core differentiator (an AI that understands *why* a customer hasn't paid) is a templated non-answer. See Critical Issue #1.
+1. **The default, zero-config AI experience is not what the product promises.** With no `GROQ_API_KEY` (the out-of-the-box state, including the seeded demo account described in the README), every invoice — regardless of amount, days overdue, or notes text — gets situation "Unknown" and the identical recommended action, "Send a friendly first reminder…". Notes that say "customer disputes this charge" or "will pay by the 30th" are completely ignored by the analysis. This is defensible as an offline fallback, and it is honestly labelled, but it means the first impression of the product's core differentiator (an AI that understands *why* a customer hasn't paid) is a templated non-answer. See Critical Issue #1. *(Update 2026-09-29: this was observed with notes supplied via CSV import. Promise and dispute information recorded through the product forms is honoured by the offline analysis, so the risk is narrower than stated here, and C1 is re-scored High.)*
 2. **The AI recommendation on the dashboard goes stale silently in the main table.** After I recorded a dispute on an invoice, the dashboard's "All outstanding invoices" table still showed "Unknown / Send a friendly first reminder" for that same invoice in the grid, while a separate card correctly said "Disputed." A user who only glances at the table could still see a nudge toward a generic reminder for a customer who is actively disputing the charge — the opposite of "relationship-safe." See High Issue #1.
 3. **Dashboard tables do not adapt to mobile or tablet.** The priority tables overflow their container; on a 390px-wide phone only Priority/Invoice/Customer are visible, and Amount, Overdue, Situation, and Recommended Action — the numbers an owner is checking on their phone — are scrolled off-screen with no visible cue that more columns exist. See High Issue #2.
 
@@ -44,14 +63,18 @@ None of this is a "stop everything" situation — nothing I found let money move
 
 Anything that could prevent safe use if unaddressed before real customer testing.
 
+> **Update 2026-09-29:** no finding remains Critical after re-scoring. C1 is kept here under its original ID for continuity and is now rated High (see its Severity line).
+
 ### C1. The default AI experience (no API key) ignores the one thing agencies actually write in their notes
+
+> **Update 2026-09-29 — narrowed and re-scored (Critical → High).** The offline/mock provider ignores notes supplied through **CSV import**. Promise and dispute information recorded through the product forms **is** honoured (situation "Promised payment" with high confidence, or "Needs human judgement"; follow-up dates adjust; the draft is dispute-aware). The description below was written on 2026-09-28 and applies to imported notes in offline mode, not to all recorded context. Limitation: offline mode only; a real AI provider was not tested. Interpretation: Critical is not supported by the current evidence, because nothing sends without a human click, the structured path works, and the offline caption is shown; the remaining issue is credibility and first impression for users who import context as notes. This re-score is a reviewer judgement and can be overridden.
 
 - **Where it occurs:** Every invoice analysis when `AI_PROVIDER=mock`/unset and no `GROQ_API_KEY` — which is the shipped default in `.env.example`, and therefore also the state of the `npm run db:seed` demo account (`demo@cashpilot.local`) that the README tells a new evaluator to sign in with.
 - **Why it matters:** The product's entire value proposition, per its own description, is "shows which overdue invoices need attention, **suggests why a customer may not have paid**." I imported invoices with notes reading "Customer disputes this charge – says scope was reduced mid-project" and "Client emailed: will pay by the 30th once their invoice from us clears." Both came back with situation **Unknown**, 7/10 and 5/10 priority computed only from amount/days-overdue, and the *identical* recommended action as a customer with zero notes: "Send a friendly first reminder and ask the customer to confirm they received the invoice." A prospect trying the product with realistic notes, on the default configuration, will conclude the AI doesn't read anything — because in this mode it doesn't.
 - **Evidence:** `qa/screenshots/16-desktop-invoice-delta-dispute-note.png` / `18-desktop-invoice-cedar-promise-note.png` (source code: `src/server/ai/providers/mock.ts` calls the exact same `ruleBasedAnalysis` used as the fallback; it never looks at the `notes` field). Confirmed in `DECISIONS.md` D30/D33 — this is intentional, not a bug.
 - **Suggested fix:** Not a code change to the guardrails (those are correct and should stay). Two lower-risk options: (a) make the mock provider do a *light*, clearly-labelled heuristic pass over notes (e.g., detect words like "dispute"/"promise"/"will pay" and surface them as a suggestion the user must still confirm, still tagged "offline mode, not verified"), so the demo shows the *shape* of the value without inventing facts; or (b) if a real key is unavailable for a trial, put a visible banner on the dashboard/analysis card — not just a small "Source: rule-based (offline mode)" caption — saying "Connect an AI provider to get situation-aware analysis; this is a offline placeholder based on days overdue and amount only." Either removes the risk that a prospect judges the finished product by its de-fanged demo mode.
-- **Severity:** Critical (credibility of core value prop)
-- **Fix before first customer testing:** Yes — at minimum, ship the more prominent "offline mode" banner (b); it's a small change with an outsized trust payoff.
+- **Severity:** ~~Critical~~ **High** (re-scored 2026-09-29; originally Critical — credibility of core value prop)
+- **Fix before first customer testing:** Originally "Yes". Update 2026-09-29: conditional — yes if the pilot runs offline and relies on imported notes; otherwise no. At minimum, ship the more prominent "offline mode" notice (b), and/or steer users to the promise and dispute forms; it's a small change with an outsized trust payoff.
 
 ---
 
@@ -71,6 +94,7 @@ Anything that could prevent safe use if unaddressed before real customer testing
 - **Where it occurs:** `Dashboard` (both "Needs attention today" and "All outstanding invoices by priority" tables), at 390px (phone) and 834px (tablet) viewports.
 - **Why it matters:** The invoice **detail** page is genuinely well responsive — it reflows into clean stacked cards on mobile (`qa/screenshots/45-mobile-invoice-detail.png`). The dashboard tables do not: on a phone, only Priority / Invoice / Customer are visible before the row is cut off; Amount, Overdue, Situation, Recommended Action, and Follow-ups require horizontal scrolling with no visible affordance (no scroll shadow, no "→ more" hint) that more columns exist. On tablet the same table is cut off one column earlier than desktop. This is the screen an owner is most likely to check from their phone between meetings — and it's the one page where the numbers that matter (amount owed, why it's urgent) are hidden by default.
 - **Evidence:** `qa/screenshots/44-mobile-dashboard.png`, `qa/screenshots/44-tablet-dashboard.png`.
+- **Update 2026-09-29 — confirmed.** Re-checked in Chromium at 390px and 768px: the dashboard tables clip their right-hand columns behind an inner horizontal scroll with no obvious visible cue. The same pass found no page-level horizontal overflow, which is consistent: the overflow is inside the table's own scroll region, which a page-level check does not detect. Limitation: Chromium only; the columns clipped at 768px were not listed.
 - **Suggested fix:** On narrow viewports, either switch the dashboard tables to the same stacked-card pattern already used successfully on the invoice detail page, or make the horizontal scroll region visually obvious (sticky first column + fade/shadow at the cut edge) and put Amount before Customer in scroll order since it's the more decision-relevant field.
 - **Severity:** High (this is the primary interface for the primary device many owners will actually check it on)
 - **Fix before first customer testing:** Recommended, especially if any early customer will be shown the product on a phone/tablet during a sales conversation.
@@ -83,6 +107,16 @@ Anything that could prevent safe use if unaddressed before real customer testing
 - **Suggested fix:** Not "silently import the valid rows" (that would undermine the safety rationale). Instead: let the user download a copy of the file with only the bad rows extracted (or highlighted) after a failed import, so the fix-and-reupload loop doesn't require them to re-locate every flagged row by hand in a 500-row spreadsheet.
 - **Severity:** High (first-import friction directly affects whether a trial user reaches the "aha" moment at all)
 - **Fix before first customer testing:** Worth doing before onboarding a real agency with a non-trivial invoice list; the current behaviour is acceptable for a guided pilot where you import the file together.
+
+### H4. Accounting-software export layouts are rejected, with no column mapping *(new 2026-09-29; severity provisional)*
+
+- **Where it occurs:** `/import`, when a file does not use the importer's exact column names and date format.
+- **Observed:** A QuickBooks-style and a Xero-style CSV were both rejected. The error explains which columns are expected but offers no way to map the file's columns onto them. Read from the fixtures and the importer: the QuickBooks-style file has header `Date,Transaction type,Num,Customer,Due date,Open balance`, DD/MM/YYYY dates, amounts like `"$4,250.00"`, and no email or currency column; the Xero-style file has header `ContactName,EmailAddress,InvoiceNumber,InvoiceDate,DueDate,Total,InvoiceAmountDue,Currency` and dates like `15 Jul 2026`. The importer requires exact snake_case column names and ISO `YYYY-MM-DD` dates.
+- **Limitation:** Both files are hand-written representative fixtures, not downloaded vendor exports. Real exports vary by report and settings. This is **not** proof that every actual QuickBooks or Xero export will fail, and it is not proof that they would pass.
+- **Interpretation:** A real onboarding usability issue. The import page documents the required format well (see the first-user journey), but a first-time user with an accounting export has to reshape it by hand, and the error tells them what is expected without helping them get there. The QuickBooks-style layout has no email column at all, so column mapping alone would not be enough. Related to H3. Severity is provisional because the likelihood with real exports is unverified.
+- **Suggested fix (not applied):** Test with two or three real exports from pilot candidates first. Then consider a column-mapping step or header aliases for common accounting names; common date and amount formats with explicit user confirmation of ambiguous DD/MM vs MM/DD dates rather than guessing; a downloadable template CSV and short export guidance.
+- **Severity:** High (provisional)
+- **Fix before first customer testing:** Likely for a self-serve pilot; low for a guided pilot where the file is reshaped together. Re-assess after testing real exports.
 
 ---
 
