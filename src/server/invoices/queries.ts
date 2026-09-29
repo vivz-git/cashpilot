@@ -137,6 +137,7 @@ export async function getInvoiceDetail(db: Database, ctx: AuthContext, id: strin
       subject: emailMessages.subject,
       body: emailMessages.body,
       status: emailMessages.status,
+      provider: emailMessages.provider,
       attempts: emailMessages.attempts,
       error: emailMessages.error,
       sentAt: emailMessages.sentAt,

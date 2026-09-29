@@ -20,6 +20,8 @@ export function DraftEditor(props: {
   canEdit: boolean;
   canSend: boolean;
   disputed: boolean;
+  /** Email is in test mode: sends are recorded but not delivered. */
+  testMode: boolean;
 }) {
   const [subject, setSubject] = useState(props.subject);
   const [body, setBody] = useState(props.body);
@@ -97,6 +99,9 @@ export function DraftEditor(props: {
       <div className="flex flex-col gap-3 border-t border-slate-200 pt-3 sm:flex-row sm:items-center sm:justify-between">
         <p className="text-xs text-slate-500">
           Nothing is sent until you click Approve &amp; Send. The email goes to {props.recipient} as plain text and replies come to your address.
+          {props.testMode && (
+            <span className="mt-1 block font-medium text-amber-800">Test mode: this email will be recorded in CashPilot but not delivered.</span>
+          )}
         </p>
         <DraftButtons
           canEdit={props.canEdit}

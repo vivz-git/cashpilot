@@ -1,6 +1,24 @@
 import Link from "next/link";
 import { logoutAction } from "@/app/actions/auth";
 import { requireSession } from "@/server/auth/session";
+import { getRuntimeModes, type RuntimeModes } from "@/server/runtime-mode";
+
+/** Tells everyone when emails are not really delivered or analysis is not real AI. */
+function ModeBanner({ modes }: { modes: RuntimeModes }) {
+  const lines: string[] = [];
+  if (modes.email === "mock") lines.push("Test mode: emails are recorded in CashPilot but not delivered to customers.");
+  if (modes.email === "misconfigured") lines.push("Email delivery is not configured correctly. Sending will fail until an administrator fixes it.");
+  if (modes.ai === "mock") lines.push("AI analysis is in offline mode: it uses simple rules and does not read notes imported from CSV.");
+  if (modes.ai === "misconfigured") lines.push("The AI provider is not configured correctly. Analysis will fail until an administrator fixes it.");
+  if (lines.length === 0) return null;
+  return (
+    <div className="border-b border-amber-200 bg-amber-50" data-testid="mode-banner">
+      <div className="mx-auto max-w-7xl space-y-0.5 px-4 py-2 text-xs text-amber-900">
+        {lines.map((l) => <p key={l}>{l}</p>)}
+      </div>
+    </div>
+  );
+}
 
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
   const session = await requireSession();
@@ -31,6 +49,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
           </div>
         </div>
       </header>
+      <ModeBanner modes={getRuntimeModes()} />
       <main className="mx-auto max-w-7xl px-4 py-6">{children}</main>
     </div>
   );

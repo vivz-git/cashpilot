@@ -16,6 +16,7 @@ import { can } from "@/server/auth/context";
 import { requireSession } from "@/server/auth/session";
 import { NotFoundError } from "@/server/errors";
 import { getInvoiceDetail } from "@/server/invoices/queries";
+import { getRuntimeModes } from "@/server/runtime-mode";
 import { DraftEditor } from "./draft-editor";
 import { OutcomeForm } from "./outcome-form";
 
@@ -173,6 +174,7 @@ export default async function InvoicePage({ params }: { params: Promise<{ id: st
                 canEdit={canWrite}
                 canSend={canSend}
                 disputed={invoice.disputeStatus === "open"}
+                testMode={getRuntimeModes().email !== "smtp"}
               />
             )}
           </Card>
@@ -186,7 +188,12 @@ export default async function InvoicePage({ params }: { params: Promise<{ id: st
                   <li key={e.id} className="rounded-md border border-slate-200 p-3 text-sm" data-testid="sent-email">
                     <div className="flex flex-wrap items-center justify-between gap-2">
                       <p className="font-medium text-slate-900">{e.subject}</p>
-                      <Badge tone={e.status === "sent" ? "green" : e.status === "failed" ? "red" : "blue"}>{e.status}</Badge>
+                      <div className="flex flex-wrap gap-1">
+                        <Badge tone={e.status === "sent" ? "green" : e.status === "failed" ? "red" : "blue"}>{e.status}</Badge>
+                        {e.provider === "mock" && e.status === "sent" && (
+                          <Badge tone="amber" title="Sent in test mode: recorded in CashPilot, not delivered to the customer">test mode · not delivered</Badge>
+                        )}
+                      </div>
                     </div>
                     <p className="mt-0.5 text-xs text-slate-500">
                       To {e.recipient} · by {e.senderName ?? "former user"} · {formatDateTime(e.sentAt ?? e.createdAt)} · {e.attempts} attempt{e.attempts === 1 ? "" : "s"}
