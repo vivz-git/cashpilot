@@ -37,6 +37,7 @@ these after testing with real users.
 | D25 | Limits: 2 MB file, 2,000 rows | Protects the server; far above a 5–30 person agency's open invoice count. |
 | D26 | `days_overdue` is computed at read time from `due_date`, not stored | A stored value goes stale every day. |
 | D27 | Invoice `status` is `open` or `paid`; dispute state is a separate `dispute_status` (`none`, `open`, `resolved`) | Matches the spec's separate "status" and "dispute status" fields. |
+| D29 | Files that do not use CashPilot's column names get a column-matching step instead of an error. Suggestions come from common accounting-export names (preferring the balance still owed over the invoice total); the user confirms every column and the date order before anything is imported. Numeric dates are read day-first or month-first only when the user chooses (pre-selected only when the file makes it unambiguous, e.g. 31/03/2026). Currency symbols/codes in amounts are stripped only when they match the invoice currency. Customer email stays required | Accounting exports use their own layouts, and reshaping a file by hand blocked onboarding. A general mapping step avoids hard-coding any vendor's format. Asking rather than guessing keeps D22's rule against silently misreading dates, and refusing mismatched symbols stops money being mislabelled. Files already in CashPilot's format import exactly as before |
 | D28 | CSV cells starting with `=`, `+`, `-`, `@` are stored as text; no CSV export exists | Formula injection only matters on export; there is none. |
 
 ## AI
@@ -51,6 +52,7 @@ these after testing with real users.
 | D35 | Draft safety check: generated drafts are scanned for threatening/legal/guilt language, must include the invoice number, and are plain text. If the model output fails the check, a safe template is used instead | "Avoid threatening language / legal claims / guilt-based manipulation." User edits are also scanned and warnings are shown, but a human may still send after reviewing. |
 | D36 | Priority score (1–10) comes from the model but must stay within ±3 of a transparent fact-based baseline (days overdue, amount vs. other open invoices, unanswered reminders, promises); the fallback uses the baseline itself | Spec requires the AI priority; the bound stops injected customer text from burying or inflating an invoice, and the fallback keeps the queue usable if the provider is down. |
 | D37 | "When uncertain, escalate to a human": low-confidence or `unknown` results set recommended action to human review and are flagged in the UI | Product constraint. |
+| D39 | Dashboard tables show recorded facts over a stored recommendation: an open dispute is always shown as "Disputed — resolve before a payment reminder", and a recommendation older than the invoice's latest change is replaced by "New activity since the last analysis. Re-analyze" | The stored AI fields only change on re-analysis, so after a dispute was recorded the table kept advising a friendly reminder. Same rule as D33, applied to display |
 | D38 | Bulk "Analyze outstanding" runs synchronously in a Server Action, capped at 25 invoices per click | No job queue needed at MVP scale; avoids long-running requests. A background job runner can replace it later. |
 
 ## Email
@@ -66,6 +68,7 @@ these after testing with real users.
 | D46 | Every send attempt writes an `email_messages` row (sent_at, recipient, subject, body, invoice, user, delivery status, error) and an audit log entry | Audit logs for external actions. |
 | D47 | A send still in `sending` after 15 minutes is treated as interrupted: marked failed with "delivery unknown" and offered for a manual retry | Prevents a crash from blocking an invoice forever, without ever resending automatically. |
 | D48 | "Approve & Send" is one button; the click is the approval. No extra confirmation checkbox | Spec asks for an explicit click with minimal clicks. The recipient and "nothing is sent until you click" are shown next to the button. |
+| D48a | While email is in mock mode (the default) or AI is offline, every page shows a banner saying so; emails recorded by the mock provider are labelled "test mode · not delivered"; a provider selected without its key/host is shown as misconfigured | A deployment that forgot `EMAIL_PROVIDER=smtp` would otherwise show reminders as "sent" that never left the server |
 | D49 | Replies go to the approving user (`Reply-To`) | Customer replies reach a human; automatic reply ingestion is out of scope for the MVP. |
 
 ## Reply tracking and timeline

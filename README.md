@@ -39,12 +39,24 @@ demo@cashpilot.local / demo-password-123
 
 ## Setting it up for real use
 
-By default, CashPilot runs in "offline mode": AI analysis uses simple built-in rules, and emails are only recorded, never sent. To use it for real:
+By default, CashPilot runs in "offline mode": AI analysis uses simple built-in rules (and does not read notes imported from CSV), and emails are only recorded, never sent. While either is true, every page shows a yellow banner saying so, and emails recorded this way are labelled "test mode · not delivered".
+
+To use it for real:
 
 1. Set `AI_PROVIDER=groq` and `GROQ_API_KEY=...` in `.env` for real AI analysis.
 2. Set `EMAIL_PROVIDER=smtp` and your `SMTP_HOST` / `SMTP_USER` / `SMTP_PASSWORD` to actually send emails.
 
+If a provider is selected but its key or host is missing, the banner says it is misconfigured. If Groq is unreachable, each analysis falls back to the built-in rules and is labelled "rule-based fallback".
+
 Full list of settings: [`.env.example`](.env.example).
+
+### Before a pilot with a real customer
+
+- [ ] Run over HTTPS with `APP_URL` set to the https address.
+- [ ] Set `AI_PROVIDER=groq` + `GROQ_API_KEY`, analyze one invoice with made-up data, and check the analysis says "groq" (not "offline mode" or "fallback").
+- [ ] Set `EMAIL_PROVIDER=smtp` + SMTP settings + a real `EMAIL_FROM`, then Approve & Send one reminder to your own mailbox and check it arrives and replies come back to you.
+- [ ] Confirm the yellow test-mode banner is gone.
+- [ ] Import the customer's real export (see below) together with them the first time.
 
 ## CSV format
 
@@ -52,6 +64,8 @@ Required columns: `customer_name, customer_email, invoice_number, invoice_date, 
 Optional: `account_manager, notes`.
 
 Dates look like `2026-07-31`. Amounts are plain numbers like `1250.00`, no currency symbols. Currency is a 3-letter code like `USD` or `EUR`. See an example file: [`e2e/fixtures/invoices.csv`](e2e/fixtures/invoices.csv).
+
+**Files with other column names** (for example an export from an accounting tool) can be uploaded as they are. CashPilot suggests which column holds each field and asks you to confirm before importing anything. When matching columns you can also choose day-first or month-first dates, use dates like `15 Jul 2026`, amounts with a currency symbol (`$4,250.00`), and one currency for every row if the file has no currency column. Every invoice still needs a customer email; if the export has none, add an email column first. This has been tested with hand-written files in typical export layouts, not yet with real exports from QuickBooks, Xero or other tools.
 
 ## Commands
 
