@@ -29,6 +29,8 @@ export type AttentionReason = "follow_up_due" | "never_contacted" | "promise_bro
 export interface InvoiceRow extends Invoice {
   daysOverdue: number;
   attention: AttentionReason | null;
+  /** Something was recorded (reply, promise, dispute, send…) after the last AI analysis. */
+  analysisOutdated: boolean;
 }
 
 /** Why an invoice needs attention today (DECISIONS.md D52), or null. */
@@ -44,7 +46,13 @@ export function attentionReason(inv: Invoice, now: Date = new Date()): Attention
 }
 
 function toRow(inv: Invoice, now: Date): InvoiceRow {
-  return { ...inv, daysOverdue: daysOverdue(inv.dueDate, now), attention: attentionReason(inv, now) };
+  return {
+    ...inv,
+    daysOverdue: daysOverdue(inv.dueDate, now),
+    attention: attentionReason(inv, now),
+    // Every change that affects the recommendation updates `updated_at`; analysis sets both together.
+    analysisOutdated: inv.aiAnalyzedAt !== null && inv.updatedAt.getTime() > inv.aiAnalyzedAt.getTime(),
+  };
 }
 
 /** Highest AI priority first; unanalysed invoices after analysed ones; then most overdue. */

@@ -12,6 +12,41 @@ export function SituationBadge({ situation }: { situation: InvoiceRow["aiSituati
   return <Badge tone={tone}>{SITUATION_LABELS[situation]}</Badge>;
 }
 
+/**
+ * Recorded facts win over a stored AI recommendation (DECISIONS.md D33): an open dispute is always
+ * shown as a dispute, and a recommendation made before newer activity is marked as out of date.
+ */
+function Guidance({ inv }: { inv: InvoiceRow }) {
+  if (inv.disputeStatus === "open") {
+    return (
+      <>
+        <td className="px-2 py-2">
+          <Badge tone="red">Disputed</Badge>
+        </td>
+        <td className="max-w-[320px] px-2 py-2 text-slate-700">
+          <span className="line-clamp-2">Customer disputes this invoice. Resolve the dispute before sending a payment reminder.</span>
+        </td>
+      </>
+    );
+  }
+  return (
+    <>
+      <td className="px-2 py-2">
+        <SituationBadge situation={inv.aiSituation} />
+      </td>
+      <td className="max-w-[320px] px-2 py-2 text-slate-700">
+        {inv.analysisOutdated ? (
+          <span className="line-clamp-2 text-amber-800" data-testid="analysis-outdated">
+            New activity since the last analysis. Re-analyze for an up-to-date recommendation.
+          </span>
+        ) : (
+          <span className="line-clamp-2">{inv.aiRecommendedAction ?? <span className="text-slate-400">—</span>}</span>
+        )}
+      </td>
+    </>
+  );
+}
+
 export function OverdueCell({ days }: { days: number }) {
   if (days === 0) return <span className="text-slate-500">Not due</span>;
   return <span className={`num ${days > 60 ? "font-semibold text-red-700" : days > 30 ? "text-amber-800" : ""}`}>{days}d</span>;
@@ -52,12 +87,7 @@ export function InvoiceTable({ rows, showAttention = false }: { rows: InvoiceRow
               <td className="whitespace-nowrap px-2 py-2 text-right">
                 <OverdueCell days={inv.daysOverdue} />
               </td>
-              <td className="px-2 py-2">
-                <SituationBadge situation={inv.aiSituation} />
-              </td>
-              <td className="max-w-[320px] px-2 py-2 text-slate-700">
-                <span className="line-clamp-2">{inv.aiRecommendedAction ?? <span className="text-slate-400">—</span>}</span>
-              </td>
+              <Guidance inv={inv} />
               <td className="num px-2 py-2 text-right">{inv.followUpCount}</td>
               <td className="whitespace-nowrap px-4 py-2">
                 {showAttention && inv.attention ? (

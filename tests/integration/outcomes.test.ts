@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 import { getDb } from "@/db";
 import { activities, followUps, invoices } from "@/db/schema";
 import { listTimeline } from "@/server/activities";
-import { generateDraft } from "@/server/ai/service";
+import { analyzeInvoice, generateDraft } from "@/server/ai/service";
 import { getDashboard } from "@/server/invoices/queries";
 import { recordOutcome } from "@/server/invoices/outcomes";
 import { addUser, createInvoice, createOrg } from "../support/factories";
@@ -88,6 +88,23 @@ describe("manual outcome recording", () => {
     const attention = Object.fromEntries(d.needsAttention.map((r) => [r.id, r.attention]));
     expect(attention).toEqual({ [broken]: "promise_broken", [fresh]: "never_contacted" });
     expect(d.priority.map((r) => r.id)).toContain(notDue);
+  });
+
+  it("flags a dashboard recommendation as outdated once an outcome is recorded after the analysis", async () => {
+    const owner = await createOrg();
+    const id = await createInvoice(owner, { due_date: "2026-08-01" });
+    const analyzedAt = new Date("2026-09-15T12:00:00Z");
+    await analyzeInvoice(getDb(), owner, id, { now: analyzedAt });
+
+    const row = async () => (await getDashboard(getDb(), owner, NOW)).priority.find((r) => r.id === id)!;
+    expect(await row()).toMatchObject({ analysisOutdated: false, aiSituation: "unknown" });
+
+    await recordOutcome(getDb(), owner, id, { type: "dispute", note: "Wrong PO" }, new Date("2026-09-15T13:00:00Z"));
+    // The stored AI situation is unchanged until re-analysis, so the dashboard must not present it as current.
+    expect(await row()).toMatchObject({ analysisOutdated: true, aiSituation: "unknown", disputeStatus: "open" });
+
+    await analyzeInvoice(getDb(), owner, id, { now: new Date("2026-09-15T14:00:00Z") });
+    expect(await row()).toMatchObject({ analysisOutdated: false, aiSituation: "dispute" });
   });
 
   it("viewers cannot record outcomes and other organizations cannot see the invoice", async () => {
