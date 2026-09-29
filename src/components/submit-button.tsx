@@ -10,6 +10,7 @@ export function SubmitButton({
   disabled,
   name,
   value,
+  block = false,
 }: {
   children: React.ReactNode;
   pendingText?: string;
@@ -17,10 +18,12 @@ export function SubmitButton({
   disabled?: boolean;
   name?: string;
   value?: string;
+  /** Full width, for single-column forms. */
+  block?: boolean;
 }) {
   const { pending } = useFormStatus();
   return (
-    <button type="submit" name={name} value={value} disabled={pending || disabled} aria-busy={pending} className={buttonClass[variant]}>
+    <button type="submit" name={name} value={value} disabled={pending || disabled} aria-busy={pending} className={`${buttonClass[variant]} ${block ? "w-full py-2.5" : ""}`}>
       {pending ? (pendingText ?? "Working…") : children}
     </button>
   );
