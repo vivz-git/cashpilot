@@ -1,11 +1,11 @@
 # Progress
 
-_Last updated: 2026-09-29_
+_Last updated: 2026-09-30_
 
 ## Status: ready for a controlled pilot (not production-verified)
 
-The branch `claude/peaceful-dijkstra-vgphzy` is on GitHub as draft PR #1. The 2026-09-29 pilot-readiness
-fixes below are committed locally on that branch and have not been pushed.
+The branch `claude/peaceful-dijkstra-vgphzy` is on GitHub as draft PR #1. The five 2026-09-29 pilot-readiness
+commits below (`fb66b9d`, `048a9b8`, `20a0695`, `c05d5cf`, `b11b562`) are pushed and included in PR #1.
 
 ## Completed
 
@@ -42,7 +42,7 @@ Findings from the QA passes (PR #3) were checked against the code. Fixed as pilo
 Assessed and **not** treated as blockers:
 
 - Dashboard tables on phone/tablet hide right-hand columns behind an inner scroll (QA H2). All data is reachable, the invoice page reflows well, and the pilot is desktop-first. Scheduled for the frontend redesign.
-- Offline AI ignores notes imported from CSV. The pilot should run with Groq; offline mode is now labelled on every page.
+- Offline AI ignores notes imported from CSV (QA C1, re-scored from Critical to High on 2026-09-29). The pilot should run with Groq; offline mode is now labelled on every page.
 - All-or-nothing import (QA H3), teammate onboarding (M2), native form validation (M3), analysis progress (M4).
 
 ### Test coverage against the spec
@@ -61,7 +61,7 @@ Nothing.
 
 ## Remaining (owner action needed)
 
-1. Review and push the local pilot-readiness commits to PR #1.
+1. Review PR #1 (the pilot-readiness commits are already pushed) and mark it ready for review when satisfied.
 2. Choose production hosting and PostgreSQL; set `APP_URL` (https), `DATABASE_URL`, `EMAIL_*`/`SMTP_*`, and `AI_PROVIDER=groq` + `GROQ_API_KEY`.
 3. Send a real test email to your own mailbox through your SMTP provider before using it with customers.
 4. Try the workflow with a few real users (per the spec, before adding features).
