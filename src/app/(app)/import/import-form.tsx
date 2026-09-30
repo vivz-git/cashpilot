@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { startTransition, useActionState, useRef, useState } from "react";
 import { importCsvAction, type ImportState } from "@/app/actions/import";
+import { UploadIcon } from "@/components/icons";
 import { SubmitButton } from "@/components/submit-button";
 import { Alert, buttonClass, inputClass } from "@/components/ui";
 import {
@@ -39,26 +40,34 @@ export function ImportForm() {
     startTransition(() => action(fd));
   }
 
+  const stage = visible?.imported !== undefined ? 3 : visible?.needsMapping ? 2 : 1;
+
   return (
-    <div className="space-y-4">
+    <div className="space-y-5">
+      <ImportSteps stage={stage} />
       <form
         action={action}
         onSubmit={() => {
           setFile(input.current?.files?.[0] ?? null);
           setStale(false);
         }}
-        className="flex flex-col gap-3 sm:flex-row sm:items-center"
+        className="flex flex-col gap-4 rounded-xl border border-dashed border-slate-300 bg-slate-50/60 p-5 transition-colors focus-within:border-brand-500 hover:border-slate-400 sm:flex-row sm:items-center"
       >
-        <input
-          ref={input}
-          type="file"
-          name="file"
-          accept=".csv,text/csv"
-          required
-          aria-label="CSV file"
-          onChange={() => setStale(true)}
-          className="block w-full text-sm text-slate-700 file:mr-3 file:rounded-md file:border file:border-slate-300 file:bg-white file:px-3 file:py-1.5 file:text-sm file:font-medium hover:file:bg-slate-50"
-        />
+        <div className="flex min-w-0 flex-1 items-center gap-3">
+          <span className="grid size-10 shrink-0 place-items-center rounded-lg bg-white text-slate-500 shadow-card ring-1 ring-slate-200/80">
+            <UploadIcon className="size-5" />
+          </span>
+          <input
+            ref={input}
+            type="file"
+            name="file"
+            accept=".csv,text/csv"
+            required
+            aria-label="CSV file"
+            onChange={() => setStale(true)}
+            className="block w-full min-w-0 text-sm text-slate-600 file:mr-3 file:rounded-lg file:border-0 file:bg-white file:px-3 file:py-2 file:text-sm file:font-medium file:text-ink file:shadow-xs file:ring-1 file:ring-inset file:ring-slate-300 hover:file:bg-slate-50"
+          />
+        </div>
         <SubmitButton pendingText="Importing…">Import</SubmitButton>
       </form>
 
@@ -77,6 +86,35 @@ export function ImportForm() {
 
       <ImportResultView state={visible} />
     </div>
+  );
+}
+
+const STEPS = ["Upload file", "Match columns", "Imported"];
+
+function ImportSteps({ stage }: { stage: 1 | 2 | 3 }) {
+  return (
+    <ol className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs" aria-label="Import steps">
+      {STEPS.map((label, i) => {
+        const n = i + 1;
+        const state = n < stage ? "done" : n === stage ? "current" : "todo";
+        return (
+          <li key={label} className="flex items-center gap-2" aria-current={state === "current" ? "step" : undefined}>
+            <span
+              className={`grid size-5 place-items-center rounded-full font-semibold ${
+                state === "done" ? "bg-emerald-600 text-white" : state === "current" ? "bg-brand-700 text-white" : "bg-slate-100 text-slate-500"
+              }`}
+            >
+              {n}
+            </span>
+            <span className={state === "current" ? "font-medium text-ink" : "text-slate-500"}>
+              {label}
+              {n === 2 && <span className="text-slate-400"> (if needed)</span>}
+            </span>
+            {n < STEPS.length && <span aria-hidden="true" className="h-px w-6 bg-slate-200" />}
+          </li>
+        );
+      })}
+    </ol>
   );
 }
 
@@ -150,14 +188,14 @@ function ColumnMatcher({
   return (
     <form
       data-testid="column-matcher"
-      className="space-y-4 rounded-md border border-slate-200 bg-slate-50 p-4"
+      className="space-y-5 rounded-xl border border-slate-200/80 bg-white p-5 shadow-raised"
       onSubmit={(e) => {
         e.preventDefault();
         onSubmit(JSON.stringify({ columns, dateFormat, defaultCurrency: columns.currency ? undefined : defaultCurrency }));
       }}
     >
       <div>
-        <h3 className="text-sm font-semibold text-slate-900">Match your columns</h3>
+        <h3 className="text-[0.9375rem] font-semibold tracking-tight text-ink">Match your columns</h3>
         <p className="mt-0.5 text-sm text-slate-600">
           {fileName} ({inspection.rowCount} row{inspection.rowCount === 1 ? "" : "s"}) doesn&apos;t use CashPilot&apos;s column
           names. Check which column holds each field. Suggestions are based on common accounting-export names.

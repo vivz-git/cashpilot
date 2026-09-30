@@ -3,6 +3,7 @@
 import { useActionState, useMemo, useState } from "react";
 import { useFormStatus } from "react-dom";
 import { approveAndSendAction, saveDraftAction } from "@/app/actions/invoices";
+import { ShieldCheckIcon } from "@/components/icons";
 import { Alert, Badge, buttonClass, inputClass } from "@/components/ui";
 import { checkDraftSafety } from "@/server/ai/drafting";
 
@@ -36,14 +37,18 @@ export function DraftEditor(props: {
   const words = body.split(/\s+/).filter(Boolean).length;
 
   return (
-    <form className="space-y-3" data-testid="draft-editor">
+    <form className="space-y-4" data-testid="draft-editor">
       <input type="hidden" name="invoiceId" value={props.invoiceId} />
       <input type="hidden" name="followUpId" value={props.followUpId} />
 
-      <div className="flex flex-wrap items-center gap-2 text-xs text-slate-500">
-        <span>To <span className="font-medium text-slate-800">{props.recipient}</span></span>
-        <Badge>{props.source === "ai" ? "AI draft" : "Standard template"}</Badge>
-        {dirty && <Badge tone="amber">Unsaved changes</Badge>}
+      <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg bg-slate-50 px-3 py-2 text-sm">
+        <span className="min-w-0 break-all text-slate-500">
+          To <span className="font-medium text-ink">{props.recipient}</span>
+        </span>
+        <span className="flex flex-wrap gap-1.5">
+          <Badge>{props.source === "ai" ? "AI draft" : "Standard template"}</Badge>
+          {dirty && <Badge tone="amber" dot>Unsaved changes</Badge>}
+        </span>
       </div>
 
       {props.failed && (
@@ -56,7 +61,7 @@ export function DraftEditor(props: {
       )}
 
       <label className="block text-sm">
-        <span className="mb-1 block font-medium text-slate-700">Subject</span>
+        <span className="mb-1.5 block font-medium text-slate-700">Subject</span>
         <input
           className={inputClass}
           name="subject"
@@ -68,8 +73,8 @@ export function DraftEditor(props: {
         />
       </label>
       <label className="block text-sm">
-        <span className="mb-1 flex justify-between font-medium text-slate-700">
-          Message <span className="font-normal text-slate-500">{words} words · plain text</span>
+        <span className="mb-1.5 flex justify-between font-medium text-slate-700">
+          Message <span className="num font-normal text-slate-500">{words} words · plain text</span>
         </span>
         <textarea
           className={`${inputClass} min-h-72 font-sans leading-relaxed`}
@@ -96,13 +101,16 @@ export function DraftEditor(props: {
       {sendState?.error && <Alert tone="error">{sendState.error}</Alert>}
       {sendState?.success && <Alert tone="success">{sendState.success}</Alert>}
 
-      <div className="flex flex-col gap-3 border-t border-slate-200 pt-3 sm:flex-row sm:items-center sm:justify-between">
-        <p className="text-xs text-slate-500">
-          Nothing is sent until you click Approve &amp; Send. The email goes to {props.recipient} as plain text and replies come to your address.
-          {props.testMode && (
-            <span className="mt-1 block font-medium text-amber-800">Test mode: this email will be recorded in CashPilot but not delivered.</span>
-          )}
-        </p>
+      <div className="flex flex-col gap-4 border-t border-slate-100 pt-4 sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex gap-2 text-xs text-slate-500">
+          <ShieldCheckIcon className="mt-px size-4 text-brand-600" />
+          <p className="max-w-md">
+            Nothing is sent until you click Approve &amp; Send. The email goes to {props.recipient} as plain text and replies come to your address.
+            {props.testMode && (
+              <span className="mt-1 block font-medium text-amber-800">Test mode: this email will be recorded in CashPilot but not delivered.</span>
+            )}
+          </p>
+        </div>
         <DraftButtons
           canEdit={props.canEdit}
           canSend={props.canSend}

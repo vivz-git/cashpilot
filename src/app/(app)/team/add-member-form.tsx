@@ -10,19 +10,19 @@ export function AddMemberForm() {
   return (
     <form action={action} className="grid gap-3 sm:grid-cols-2">
       <label className="block text-sm">
-        <span className="mb-1 block font-medium text-slate-700">Name</span>
+        <span className="mb-1.5 block font-medium text-slate-700">Name</span>
         <input className={inputClass} name="name" required maxLength={100} />
       </label>
       <label className="block text-sm">
-        <span className="mb-1 block font-medium text-slate-700">Email</span>
+        <span className="mb-1.5 block font-medium text-slate-700">Email</span>
         <input className={inputClass} type="email" name="email" required />
       </label>
       <label className="block text-sm">
-        <span className="mb-1 block font-medium text-slate-700">Initial password</span>
+        <span className="mb-1.5 block font-medium text-slate-700">Initial password</span>
         <input className={inputClass} type="password" name="password" required minLength={10} autoComplete="new-password" />
       </label>
       <label className="block text-sm">
-        <span className="mb-1 block font-medium text-slate-700">Role</span>
+        <span className="mb-1.5 block font-medium text-slate-700">Role</span>
         <select className={inputClass} name="role" defaultValue="member">
           <option value="member">Member — import, analyze, draft and send</option>
           <option value="viewer">Viewer — read-only</option>
