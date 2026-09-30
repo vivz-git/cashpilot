@@ -1,6 +1,9 @@
 import type { NextConfig } from "next";
 
 const securityHeaders = [
+  ...(process.env.NODE_ENV === "production"
+    ? [{ key: "Strict-Transport-Security", value: "max-age=63072000; includeSubDomains" }]
+    : []),
   { key: "X-Frame-Options", value: "DENY" },
   { key: "X-Content-Type-Options", value: "nosniff" },
   { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
@@ -24,6 +27,8 @@ const securityHeaders = [
 ];
 
 const nextConfig: NextConfig = {
+  // Lets the e2e suite build into its own directory without clobbering a dev build.
+  distDir: process.env.NEXT_DIST_DIR || ".next",
   poweredByHeader: false,
   serverExternalPackages: ["pg", "nodemailer", "bcryptjs"],
   experimental: {

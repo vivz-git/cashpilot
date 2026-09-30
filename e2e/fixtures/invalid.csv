@@ -1,0 +1,5 @@
+customer_name,customer_email,invoice_number,invoice_date,due_date,amount,currency,account_manager,notes
+Northwind Studio,,BL-9001,2026-04-01,2026-05-01,1200.00,USD,,
+Harbor Coffee Co,accounts@harborcoffee.example,BL-9002,04/07/2026,2026-08-19,950.00,USD,,
+Kite Labs GmbH,finance@kitelabs.example,BL-9003,2026-08-01,2026-08-31,twelve,EUR,,
+Kite Labs GmbH,finance@kitelabs.example,BL-9003,2026-08-01,2026-08-31,100.00,EUR,,
